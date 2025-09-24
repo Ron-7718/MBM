@@ -1,15 +1,9 @@
 import { Router } from 'express';
+import { getStatus } from '../controllers/healthController';
 
 const router = Router();
 
-router.get('/', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
-    timestamp: new Date().toISOString(),
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development'
-  });
-});
+router.get('/', getStatus);
 
 export default router;
 

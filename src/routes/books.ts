@@ -1,11 +1,8 @@
-import { Router } from 'express';
+import { Router } from "express";
+import { listBooks } from "../controllers/bookController";
 
 const router = Router();
 
-router.get('/', (req, res) => {
-  res.json({ books: [] });
-});
+router.get("/", listBooks);
 
 export default router;
-
-

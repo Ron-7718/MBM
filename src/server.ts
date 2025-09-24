@@ -6,6 +6,9 @@ import healthRouter from "./routes/health";
 import authRouter from "./routes/auth";
 import userRouter from "./routes/users";
 import bookRouter from "./routes/books";
+import { corsMiddleware } from "./middleware/cors";
+import { apiLimiter } from "./middleware/rateLimiter";
+import { errorHandler, notFound } from "./middleware/errorHandler";
 
 // Load environment variables
 dotenv.config();
@@ -25,9 +28,10 @@ if (MONGO_URI) {
 }
 
 // Middleware
-app.use(cors());
+app.use(corsMiddleware);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(apiLimiter);
 
 // Basic test route
 app.get("/", (req, res) => {
@@ -41,15 +45,10 @@ app.use("/api/users", userRouter);
 app.use("/api/books", bookRouter);
 
 // Error handling middleware
-app.use((err: any, req: any, res: any, next: any) => {
-  console.error(err.stack);
-  res.status(500).json({ error: "Something went wrong!" });
-});
+app.use(errorHandler);
 
 // 404 handler
-app.use("*", (req, res) => {
-  res.status(404).json({ error: "Route not found" });
-});
+app.use(notFound);
 
 // Start server
 app.listen(PORT, () => {
