@@ -14,10 +14,10 @@ import { errorHandler, notFound } from "./middleware/errorHandler";
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 4000;
 
 // Database connection (mongoose)
-const MONGO_URI = process.env.MONGO_URI || "";
+const MONGO_URI = process.env.MONGODB_URI;
 if (MONGO_URI) {
   mongoose
     .connect(MONGO_URI)
