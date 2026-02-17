@@ -8,7 +8,7 @@ export function errorHandler(
   err: any,
   req: Request,
   res: Response,
-  next: NextFunction
+  next: NextFunction,
 ) {
   const status = err.status || 500;
   const message = err.message || "Something went wrong";
