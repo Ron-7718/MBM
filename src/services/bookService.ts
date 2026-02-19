@@ -23,9 +23,6 @@ class BookService {
     body: Record<string, unknown>,
     files?: IMulterFiles,
   ): Promise<IBook> {
-    if (!files?.frontCover?.[0]) {
-      throw ApiError.badRequest("Front cover image is required");
-    }
     if (!files?.manuscript?.[0]) {
       throw ApiError.badRequest("Manuscript PDF is required");
     }

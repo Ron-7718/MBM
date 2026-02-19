@@ -9,6 +9,7 @@ import bookRouter from "./routes/books";
 import { corsMiddleware } from "./middleware/cors";
 import { apiLimiter } from "./middleware/rateLimiter";
 import { errorHandler, notFound } from "./middleware/errorHandler";
+import path from "path";
 
 // Load environment variables
 dotenv.config();
@@ -37,6 +38,9 @@ app.use(apiLimiter);
 app.get("/", (req, res) => {
   res.json({ message: "MeBookMeta Backend is running!" });
 });
+
+// Serve uploads folder
+app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
 
 // Routes
 app.use("/api/health", healthRouter);

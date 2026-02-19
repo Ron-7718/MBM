@@ -62,18 +62,15 @@ const bookSchema = new Schema<IBook>(
     edition: {
       type: String,
       default: "1st Edition",
-      enum: {
-        values: [
-          "1st Edition",
-          "2nd Edition",
-          "3rd Edition",
-          "Revised Edition",
-          "Special Edition",
-          "Limited Edition",
-          "Collector's Edition",
-        ],
-        message: "Invalid edition type",
-      },
+      enum: [
+        "1st Edition",
+        "2nd Edition",
+        "3rd Edition",
+        "Revised Edition",
+        "Special Edition",
+        "Limited Edition",
+        "Collector's Edition",
+      ],
     },
     publisher: {
       type: String,
@@ -82,117 +79,74 @@ const bookSchema = new Schema<IBook>(
     },
 
     /* ═══════════════════════════════════
-       SECTION 02 — CATEGORY & GENRE
+       CATEGORY & GENRE
        ═══════════════════════════════════ */
     category: {
       type: String,
-      required: [true, "Category is required"],
-      enum: {
-        values: [
-          "Fiction",
-          "Non-Fiction",
-          "Academic / Textbook",
-          "Children's Books",
-          "Young Adult",
-          "Poetry",
-          "Comics / Graphic Novels",
-          "Reference / Encyclopedia",
-          "Religious / Spiritual",
-          "Cookbook / Food",
-          "Self-Help / Personal Development",
-          "Business / Finance",
-          "Biography / Memoir",
-          "Travel",
-          "Other",
-        ],
-        message: "Invalid category",
-      },
+      required: true,
     },
     genreTags: {
       type: [String],
       default: [],
-      validate: {
-        validator: (v: string[]) => v.length <= 5,
-        message: "Maximum 5 genre tags allowed",
-      },
     },
     targetAudience: {
       type: String,
-      enum: {
-        values: [
-          "",
-          "General Audience",
-          "Children (0–12)",
-          "Teenagers (13–17)",
-          "Young Adults (18–25)",
-          "Adults (25+)",
-          "Academic / Professional",
-        ],
-        message: "Invalid audience type",
-      },
+      default: "",
     },
     customTags: {
       type: [String],
       default: [],
-      validate: {
-        validator: (v: string[]) => v.length <= 15,
-        message: "Maximum 15 custom tags allowed",
-      },
     },
 
     /* ═══════════════════════════════════
-       SECTION 03 — COVER ART & MEDIA
+       MEDIA
        ═══════════════════════════════════ */
-    frontCover: {
-      type: String,
-      // required: [true, "Front cover image is required"],
-    },
+    frontCover: { type: String },
     backCover: { type: String, default: null },
     qrCode: { type: String, default: null },
 
     /* ═══════════════════════════════════
-       SECTION 04 — MANUSCRIPT
+       MANUSCRIPT
        ═══════════════════════════════════ */
     manuscript: {
       type: String,
-      required: [true, "Manuscript PDF is required"],
+      required: true,
     },
     manuscriptSize: { type: Number, default: 0 },
     samplePdf: { type: String, default: null },
 
     /* ═══════════════════════════════════
-       SECTION 05 — COPYRIGHT & LICENSING
+       COPYRIGHT
        ═══════════════════════════════════ */
     copyrightType: {
       type: String,
-      enum: {
-        values: [
-          "standard",
-          "cc-by",
-          "cc-by-nc",
-          "cc-by-sa",
-          "cc-by-nc-nd",
-          "public-domain",
-        ],
-        message: "Invalid copyright type",
-      },
+      enum: [
+        "standard",
+        "cc-by",
+        "cc-by-nc",
+        "cc-by-sa",
+        "cc-by-nc-nd",
+        "public-domain",
+      ],
       default: "standard",
     },
     copyrightYear: {
       type: Number,
       default: () => new Date().getFullYear(),
-      min: [1900, "Copyright year must be after 1900"],
-      max: [2100, "Copyright year must be before 2100"],
     },
-    copyrightHolder: { type: String, trim: true, maxlength: 200 },
+    copyrightHolder: {
+      type: String,
+      trim: true,
+      maxlength: 200,
+    },
 
     /* ═══════════════════════════════════
-       SECTION 06 — PRICING & DISTRIBUTION
+       PRICING
        ═══════════════════════════════════ */
     price: {
       type: Number,
-      required: [true, "Price is required"],
-      min: [0, "Price cannot be negative"],
+      required: true,
+      min: 0,
       default: 0,
     },
     currency: {
@@ -200,26 +154,27 @@ const bookSchema = new Schema<IBook>(
       default: "INR",
       enum: ["INR", "USD", "EUR", "GBP"],
     },
+
     allowDownload: { type: Boolean, default: true },
     allowPreview: { type: Boolean, default: true },
     isExclusive: { type: Boolean, default: false },
     preOrderEnabled: { type: Boolean, default: false },
 
     /* ═══════════════════════════════════
-       SECTION 07 — AGREEMENTS
+       AGREEMENTS
        ═══════════════════════════════════ */
     rightsConfirmed: {
       type: Boolean,
-      required: [true, "Publishing rights must be confirmed"],
+      required: true,
     },
     termsAccepted: {
       type: Boolean,
-      required: [true, "Terms must be accepted"],
+      required: true,
     },
     emailOptIn: { type: Boolean, default: false },
 
     /* ═══════════════════════════════════
-       STATUS & META
+       STATUS
        ═══════════════════════════════════ */
     status: {
       type: String,
@@ -239,13 +194,23 @@ const bookSchema = new Schema<IBook>(
   },
 );
 
-/* ── Indexes ── */
-bookSchema.index({ title: "text", description: "text", author: "text" });
+/* ═══════════════════════════════════
+   INDEXES (FIXED MULTILINGUAL)
+═══════════════════════════════════ */
+
+bookSchema.index(
+  { title: "text", description: "text", author: "text" },
+  { default_language: "none" }, // 🔥 Fix for Arabic error
+);
+
 bookSchema.index({ category: 1, status: 1 });
 bookSchema.index({ author: 1 });
 bookSchema.index({ createdAt: -1 });
 
-/* ── Pre-save: auto-generate unique slug ── */
+/* ═══════════════════════════════════
+   PRE-SAVE SLUG
+═══════════════════════════════════ */
+
 bookSchema.pre<IBook>("save", async function (next) {
   if (this.isModified("title") || this.isNew) {
     let baseSlug = slugify(this.title, { lower: true, strict: true });
@@ -255,9 +220,9 @@ bookSchema.pre<IBook>("save", async function (next) {
     while (
       await mongoose.models.Book?.findOne({ slug, _id: { $ne: this._id } })
     ) {
-      slug = `${baseSlug}-${counter}`;
-      counter++;
+      slug = `${baseSlug}-${counter++}`;
     }
+
     this.slug = slug;
   }
 
@@ -268,42 +233,17 @@ bookSchema.pre<IBook>("save", async function (next) {
   next();
 });
 
-/* ── Virtuals ── */
+/* ═══════════════════════════════════
+   VIRTUALS
+═══════════════════════════════════ */
+
 bookSchema.virtual("isFree").get(function (this: IBook) {
   return this.price === 0;
 });
 
-bookSchema.virtual("coverUrls").get(function (this: IBook) {
-  return { front: this.frontCover, back: this.backCover ?? null };
-});
-
-/* ── Instance Methods ── */
-bookSchema.methods.approve = async function (this: IBook): Promise<IBook> {
-  this.status = "approved";
-  this.approvedAt = new Date();
-  return this.save();
-};
-
-bookSchema.methods.reject = async function (
-  this: IBook,
-  reason: string,
-): Promise<IBook> {
-  this.status = "rejected";
-  this.rejectionReason = reason;
-  return this.save();
-};
-
-bookSchema.methods.archive = async function (this: IBook): Promise<IBook> {
-  this.status = "archived";
-  return this.save();
-};
-
-bookSchema.methods.incrementViews = async function (
-  this: IBook,
-): Promise<IBook> {
-  this.viewCount += 1;
-  return this.save();
-};
+/* ═══════════════════════════════════
+   MODEL EXPORT
+═══════════════════════════════════ */
 
 const Book: Model<IBook> = mongoose.model<IBook>("Book", bookSchema);
 
