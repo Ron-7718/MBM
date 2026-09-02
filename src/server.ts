@@ -6,6 +6,9 @@ import healthRouter from "./routes/health";
 import authRouter from "./routes/auth";
 import userRouter from "./routes/users";
 import bookRouter from "./routes/books";
+import categoryRouter from "./routes/categories";
+import subcategoryRouter from "./routes/subcategories";
+import adminAuthRouter from "./routes/adminAuth";
 import { corsMiddleware } from "./middleware/cors";
 import { apiLimiter } from "./middleware/rateLimiter";
 import { errorHandler, notFound } from "./middleware/errorHandler";
@@ -47,6 +50,9 @@ app.use("/api/health", healthRouter);
 app.use("/api/auth", authRouter);
 app.use("/api/users", userRouter);
 app.use("/api/books", bookRouter);
+app.use("/api/admin/auth", adminAuthRouter);
+app.use("/api/categories", categoryRouter);
+app.use("/api/subcategories", subcategoryRouter);
 
 // Error handling middleware
 app.use(errorHandler);

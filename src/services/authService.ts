@@ -1,5 +1,7 @@
 import { UserStepModel } from "../models/authModel";
 
+const OTP_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
 // ✅ Step 1: Generate a random numeric OTP (default 4-digit)
 export const generateOtp = (length = 4): string => {
   return Math.floor(1000 + Math.random() * 9000)
@@ -11,10 +13,12 @@ export const generateOtp = (length = 4): string => {
 export const saveOtp = async (identifier: string, otp: string) => {
   // Check if the record already exists
   const existingUser = await UserStepModel.findOne({ identifier });
+  const otpExpiresAt = new Date(Date.now() + OTP_TTL_MS);
 
   if (existingUser) {
-    // Update only the OTP field, don't delete user data
+    // Update only the OTP fields, don't touch the rest of the user data
     existingUser.otp = otp;
+    existingUser.otpExpiresAt = otpExpiresAt;
     await existingUser.save();
     return existingUser;
   }
@@ -23,29 +27,43 @@ export const saveOtp = async (identifier: string, otp: string) => {
   return await UserStepModel.create({
     identifier,
     otp,
+    otpExpiresAt,
     step: 1,
   });
 };
 
-// ✅ Step 2: Verify OTP validity
+// ✅ Step 2: Verify OTP validity (expired/wrong OTP never deletes the document)
 export const verifyOtpService = async (identifier: string, otp: string) => {
-  const record = await UserStepModel.findOne({ identifier, otp });
+  const record = await UserStepModel.findOne({ identifier });
 
-  if (!record) return false;
+  if (!record || !record.otp) return null;
+  if (record.otpExpiresAt && record.otpExpiresAt.getTime() < Date.now()) {
+    return null;
+  }
+  if (record.otp !== otp) return null;
 
-  // Update to step 2 after OTP verification
-  record.step = 2;
+  // A previous bug could desync `step` from actual progress, so treat the
+  // profile as complete based on its data, not the (possibly stale) step.
+  const isProfileComplete = Boolean(
+    record.name && record.dob && record.gender && record.role,
+  );
+
+  // Clear only the OTP fields; keep the rest of the document intact
+  record.otp = undefined;
+  record.otpExpiresAt = null;
+  record.step = isProfileComplete ? 4 : 2;
   await record.save();
 
-  return true;
+  return record;
 };
 
-// ✅ Step 3: Save user details after OTP verification
+// ✅ Step 4: Save user details and role after OTP verification
 export const completeProfileService = async (
   identifier: string,
   name: string,
   dob: string,
-  gender: string
+  gender: string,
+  role: "user" | "author" | "writer"
 ) => {
   // Find OTP record for this identifier (should be verified already)
   const record = await UserStepModel.findOne({ identifier });
@@ -65,7 +83,8 @@ export const completeProfileService = async (
   record.name = name;
   record.dob = dob;
   record.gender = gender;
-  record.step = 3;
+  record.role = role;
+  record.step = 4;
 
   await record.save();
 
@@ -103,10 +122,10 @@ export const loginService = async (identifier: string) => {
   // Generate a 4-digit OTP
   const otp = Math.floor(1000 + Math.random() * 9000).toString();
 
-  // Store OTP securely
+  // Store OTP securely — don't touch step, or a completed profile (step 4)
+  // would look unfinished to verifyOtpService and lose its login token
   user.otp = otp;
-  user.step = 1;
-  user.otpExpiresAt = new Date(Date.now() + 5 * 60 * 1000); // 5 min expiry
+  user.otpExpiresAt = new Date(Date.now() + OTP_TTL_MS);
   await user.save();
 
   return {

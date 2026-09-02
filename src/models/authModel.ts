@@ -1,30 +1,75 @@
 import mongoose, { Document, Schema } from "mongoose";
 
 export interface IUserStep extends Document {
-  identifier: string; // email or phone
+  identifier: string;
   otp?: string;
+  otpExpiresAt?: Date | null;
   name?: string;
   dob?: string;
   gender?: string;
-  otpExpiresAt?: Date | null;
-  step: number; // 1: registered, 2: otp verified, 3: completed
+  role?: "user" | "author" | "writer";
+  step: number;
   createdAt: Date;
+  updatedAt: Date;
 }
 
 const userStepSchema = new Schema<IUserStep>(
   {
-    identifier: { type: String, required: true, unique: true },
-    otp: { type: String },
-    name: { type: String },
-    dob: { type: String },
-    gender: { type: String },
-    step: { type: Number, default: 1 }, // Start from Step 1
-    createdAt: { type: Date, default: Date.now, expires: 600 }, // 10 min expiry
+    identifier: {
+      type: String,
+      required: true,
+      unique: true,
+    },
+
+    otp: {
+      type: String,
+    },
+
+    otpExpiresAt: {
+      type: Date,
+      default: null,
+    },
+
+    name: {
+      type: String,
+    },
+
+    dob: {
+      type: String,
+    },
+
+    gender: {
+      type: String,
+    },
+
+    role: {
+      type: String,
+      enum: ["user", "author", "writer"],
+    },
+
+    step: {
+      type: Number,
+      default: 1,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  },
 );
+
+/**
+ * OTP expiration only.
+ *
+ * This expires the OTP field's time,
+ * NOT the user document.
+ *
+ * IMPORTANT:
+ * Do NOT add a TTL index here because
+ * a TTL index on otpExpiresAt would delete
+ * the entire UserStep document.
+ */
 
 export const UserStepModel = mongoose.model<IUserStep>(
   "UserStep",
-  userStepSchema
+  userStepSchema,
 );

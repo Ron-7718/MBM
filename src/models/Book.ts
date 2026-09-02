@@ -83,7 +83,7 @@ const bookSchema = new Schema<IBook>(
        ═══════════════════════════════════ */
     category: {
       type: String,
-      required: true,
+     
     },
     genreTags: {
       type: [String],

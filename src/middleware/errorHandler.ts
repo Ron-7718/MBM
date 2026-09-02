@@ -10,7 +10,7 @@ export function errorHandler(
   res: Response,
   next: NextFunction,
 ) {
-  const status = err.status || 500;
+  const status = err.statusCode || err.status || 500;
   const message = err.message || "Something went wrong";
   if (process.env.NODE_ENV !== "production") {
     console.error(err);

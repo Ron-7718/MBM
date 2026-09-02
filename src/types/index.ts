@@ -227,6 +227,16 @@ export interface IBookRequest extends Request {
   files?: IMulterFiles;
 }
 
+export interface IPublicUser {
+  _id: string;
+  name?: string;
+  role?: string;
+  gender?: string;
+  createdAt?: Date;
+}
+
+
+
 /* ═══════════════════════════════════
    CONFIG
    ═══════════════════════════════════ */
@@ -262,4 +272,26 @@ export interface IBookFilter {
   language?: string;
   price?: { $gte?: number; $lte?: number };
   $text?: { $search: string };
+}
+
+/* ═══════════════════════════════════
+   PUBLIC USER / AUTHOR DIRECTORY
+   ═══════════════════════════════════ */
+
+export type PublicRole = "author" | "writer";
+
+export interface IUserListQuery {
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: PublicRole;
+}
+
+export interface IPublicUser {
+  _id: string;
+  name?: string;
+  role?: string;
+  gender?: string;
+  createdAt: Date;
+  bookCount: number;
 }

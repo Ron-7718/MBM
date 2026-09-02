@@ -72,12 +72,43 @@ export async function verifyOtp(req: Request, res: Response) {
         .json({ success: false, message: "Identifier and OTP are required" });
     }
 
-    const isValid = await verifyOtpService(identifier, otp);
+    const record = await verifyOtpService(identifier, otp);
 
-    if (!isValid) {
+    if (!record) {
       return res
         .status(400)
         .json({ success: false, message: "Invalid or expired OTP" });
+    }
+
+    // Already-completed profile verifying OTP to log in — issue a token now
+    if (record.step === 4) {
+      const token = jwt.sign(
+        {
+          id: record._id,
+          identifier: record.identifier,
+          name: record.name,
+        },
+        process.env.JWT_SECRET as string,
+        { expiresIn: "7d" },
+      );
+
+      return res.status(200).json({
+        success: true,
+        message: "Login successful",
+        step: 4,
+        data: {
+          token,
+          user: {
+            _id: record._id,
+            identifier: record.identifier,
+            name: record.name,
+            dob: record.dob,
+            gender: record.gender,
+            role: record.role,
+            step: record.step,
+          },
+        },
+      });
     }
 
     return res.status(200).json({
@@ -94,24 +125,34 @@ export async function verifyOtp(req: Request, res: Response) {
 }
 
 //
-// STEP 3 — Complete Profile
+// STEP 4 — Complete Profile
 //
 
 export async function completeProfile(req: Request, res: Response) {
   try {
-    const { identifier, name, dob, gender } = req.body;
+    const { identifier, name, dob, gender, role } = req.body;
+    const normalizedRole = role === "auther" ? "author" : role;
 
-    if (!identifier || !name || !dob || !gender) {
+    if (!identifier || !name || !dob || !gender || !normalizedRole) {
       return res
         .status(400)
         .json({ success: false, message: "All fields are required" });
+    }
+
+    const allowedRoles = ["user", "author", "writer"];
+    if (!allowedRoles.includes(normalizedRole)) {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid role. Allowed values are user, author, writer",
+      });
     }
 
     const userResult = await completeProfileService(
       identifier,
       name,
       dob,
-      gender
+      gender,
+      normalizedRole
     );
 
     if (!userResult?.data) {
@@ -138,7 +179,7 @@ export async function completeProfile(req: Request, res: Response) {
         user: userResult.data,
         token, // ✅ return token to frontend
       },
-      step: 3,
+      step: 4,
     });
   } catch (error: any) {
     console.error("Profile completion error:", error);
