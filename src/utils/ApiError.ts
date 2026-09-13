@@ -21,6 +21,9 @@ export default class ApiError extends Error {
 
   static conflict = (message: string): ApiError => new ApiError(409, message);
 
+  static forbidden = (message: string = "Forbidden"): ApiError =>
+    new ApiError(403, message);
+
   static internal = (message: string = "Internal server error"): ApiError =>
     new ApiError(500, message);
 

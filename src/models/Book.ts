@@ -5,6 +5,14 @@ import type { IBook } from "../types";
 const bookSchema = new Schema<IBook>(
   {
     /* ═══════════════════════════════════
+       OWNERSHIP — links a book to the account that submitted it
+       ═══════════════════════════════════ */
+    userId: {
+      type: String,
+      index: true,
+    },
+
+    /* ═══════════════════════════════════
        SECTION 01 — BOOK DETAILS
        ═══════════════════════════════════ */
     title: {

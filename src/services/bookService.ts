@@ -22,6 +22,7 @@ class BookService {
   async createBook(
     body: Record<string, unknown>,
     files?: IMulterFiles,
+    userId?: string,
   ): Promise<IBook> {
     if (!files?.manuscript?.[0]) {
       throw ApiError.badRequest("Manuscript PDF is required");
@@ -30,6 +31,7 @@ class BookService {
     const bookData = this.buildBookData(body, files);
     bookData.status = "pending_review";
     bookData.manuscriptSize = files.manuscript[0].size;
+    if (userId) bookData.userId = userId;
 
     const book = new Book(bookData);
     return await book.save();
@@ -41,9 +43,11 @@ class BookService {
   async saveDraft(
     body: Record<string, unknown>,
     files?: IMulterFiles,
+    userId?: string,
   ): Promise<IBook> {
     const bookData = this.buildBookData(body, files);
     bookData.status = "draft";
+    if (userId) bookData.userId = userId;
 
     if (files?.manuscript?.[0]) {
       bookData.manuscriptSize = files.manuscript[0].size;
@@ -71,6 +75,7 @@ class BookService {
       category,
       search,
       author,
+      userId,
       language,
       minPrice,
       maxPrice,
@@ -82,7 +87,17 @@ class BookService {
 
     if (status) filter.status = status;
     if (category) filter.category = category;
-    if (author) filter.author = { $regex: author, $options: "i" };
+
+    // userId reliably identifies the owner; author is a free-typed fallback for
+    // books submitted before ownership tracking existed, so match either.
+    if (userId && author) {
+      filter.$or = [{ userId }, { author: { $regex: author, $options: "i" } }];
+    } else if (userId) {
+      filter.userId = userId;
+    } else if (author) {
+      filter.author = { $regex: author, $options: "i" };
+    }
+
     if (language) filter.language = language;
 
     if (minPrice !== undefined || maxPrice !== undefined) {
@@ -139,9 +154,15 @@ class BookService {
     id: string,
     body: Record<string, unknown>,
     files?: IMulterFiles,
+    requesterId?: string,
   ): Promise<IBook> {
     const book = await Book.findById(id);
     if (!book) throw ApiError.notFound("Book not found");
+
+    // Legacy books without a recorded owner are left open; owned books can only be edited by their owner.
+    if (book.userId && book.userId !== requesterId) {
+      throw ApiError.forbidden("You do not have permission to edit this book");
+    }
 
     const updateData: Record<string, unknown> = {};
 
@@ -262,9 +283,16 @@ class BookService {
   /**
    * DELETE — remove book + associated files from disk.
    */
-  async deleteBook(id: string): Promise<{ id: string; title: string }> {
+  async deleteBook(
+    id: string,
+    requesterId?: string,
+  ): Promise<{ id: string; title: string }> {
     const book = await Book.findById(id);
     if (!book) throw ApiError.notFound("Book not found");
+
+    if (book.userId && book.userId !== requesterId) {
+      throw ApiError.forbidden("You do not have permission to delete this book");
+    }
 
     const fileFields: (keyof IBook)[] = [
       "frontCover",

@@ -1,5 +1,6 @@
 import { UserStepModel } from "../models/authModel";
 import Book from "../models/Book";
+import CreativeVideo from "../models/CreativeVideo";
 import ApiError from "../utils/ApiError";
 import type {
   IUserListQuery,
@@ -96,6 +97,8 @@ export const getPublicProfileById = async (
   user: IPublicUser;
   books: unknown[];
   bookCount: number;
+  pitchVideos: unknown[];
+  universeVideos: unknown[];
 }> => {
   const record = await UserStepModel.findOne({
     _id: id,
@@ -116,7 +119,7 @@ export const getPublicProfileById = async (
     status: "approved",
   };
 
-  const [books, bookCount] = await Promise.all([
+  const [books, bookCount, pitchVideos, universeVideos] = await Promise.all([
     Book.find(bookFilter)
       .select(
         "title slug frontCover category price createdAt viewCount",
@@ -126,6 +129,18 @@ export const getPublicProfileById = async (
       .lean(),
 
     Book.countDocuments(bookFilter),
+
+    // Videos this creative has posted to Pitch Alley / Ask the Universe —
+    // shown on their public profile whenever a visitor views it.
+    CreativeVideo.find({ userId: id, section: "pitch_alley" })
+      .select("-__v -userId")
+      .sort({ createdAt: -1 })
+      .lean(),
+
+    CreativeVideo.find({ userId: id, section: "ask_universe" })
+      .select("-__v -userId")
+      .sort({ createdAt: -1 })
+      .lean(),
   ]);
 
   return {
@@ -139,5 +154,7 @@ export const getPublicProfileById = async (
     },
     books,
     bookCount,
+    pitchVideos,
+    universeVideos,
   };
 };

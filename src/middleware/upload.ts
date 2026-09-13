@@ -14,6 +14,7 @@ const FILE_LIMITS = {
   qrCode: 2 * 1024 * 1024, // 2MB
   manuscript: 500 * 1024 * 1024, // 500MB
   sample: 20 * 1024 * 1024, // 20MB
+  video: 500 * 1024 * 1024, // 500MB
 };
 
 const ALLOWED_IMAGE_TYPES = [
@@ -25,6 +26,14 @@ const ALLOWED_IMAGE_TYPES = [
 
 const ALLOWED_PDF_TYPES = ["application/pdf"];
 
+const ALLOWED_VIDEO_TYPES = [
+  "video/mp4",
+  "video/quicktime",
+  "video/webm",
+  "video/x-matroska",
+  "video/x-msvideo",
+];
+
 /* ─────────────────────────────
    Folder Mapping
 ───────────────────────────── */
@@ -35,6 +44,7 @@ const FOLDER_MAP: Record<string, string> = {
   qrCode: "qrcodes",
   manuscript: "manuscripts",
   samplePdf: "samples",
+  video: "videos",
 };
 
 /* ─────────────────────────────
@@ -71,6 +81,7 @@ const fileFilter = (
 ): void => {
   const imageFields = ["frontCover", "backCover", "qrCode"];
   const pdfFields = ["manuscript", "samplePdf"];
+  const videoFields = ["video"];
 
   if (imageFields.includes(file.fieldname)) {
     if (ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
@@ -87,6 +98,18 @@ const fileFilter = (
     }
     return cb(
       new ApiError(400, `${file.fieldname}: Only PDF files are allowed`),
+    );
+  }
+
+  if (videoFields.includes(file.fieldname)) {
+    if (ALLOWED_VIDEO_TYPES.includes(file.mimetype)) {
+      return cb(null, true);
+    }
+    return cb(
+      new ApiError(
+        400,
+        `${file.fieldname}: Only video files (mp4, mov, webm, mkv, avi) are allowed`,
+      ),
     );
   }
 
@@ -117,6 +140,34 @@ export const bookUploadFields = upload.fields([
   { name: "manuscript", maxCount: 1 },
   { name: "samplePdf", maxCount: 1 },
 ]);
+
+/* ─────────────────────────────
+   Video Upload (Pitch Alley / Ask the Universe)
+───────────────────────────── */
+
+export const videoUploadField = upload.single("video");
+
+export const validateVideoSize = (
+  req: Request,
+  _res: Response,
+  next: NextFunction,
+): void => {
+  const file = req.file;
+  if (!file) return next();
+
+  if (file.size > FILE_LIMITS.video) {
+    const limitMB = (FILE_LIMITS.video / 1048576).toFixed(0);
+    const actualMB = (file.size / 1048576).toFixed(2);
+    fs.unlink(file.path, () => {});
+    return next(
+      ApiError.badRequest(
+        `video: File size ${actualMB}MB exceeds limit of ${limitMB}MB`,
+      ),
+    );
+  }
+
+  next();
+};
 
 /* ─────────────────────────────
    Per-field Size Validation

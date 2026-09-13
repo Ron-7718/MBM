@@ -19,6 +19,23 @@ export function requireAuth(req: Request, res: Response, next: NextFunction) {
 }
 
 /**
+ * Attaches req.user when a valid Bearer token is present, but never blocks the
+ * request — used for routes that should still work for anonymous callers.
+ */
+export function optionalAuth(req: Request, _res: Response, next: NextFunction) {
+  const authHeader = req.headers.authorization;
+  const secret = process.env.JWT_SECRET || '';
+  if (authHeader?.startsWith('Bearer ') && secret) {
+    try {
+      (req as any).user = jwt.verify(authHeader.slice(7), secret);
+    } catch {
+      // Invalid/expired token — continue as anonymous instead of failing the request.
+    }
+  }
+  next();
+}
+
+/**
  * Requires a valid JWT whose payload carries role: "admin".
  * Used to protect category/subcategory management endpoints.
  */

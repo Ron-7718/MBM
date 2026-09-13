@@ -6,6 +6,7 @@ import {
   handleMulterError,
 } from "../middleware/upload";
 import { uploadLimiter } from "../middleware/rateLimiter";
+import { optionalAuth } from "../middleware/auth";
 import {
   submitBookRules,
   updateBookRules,
@@ -23,6 +24,7 @@ const router: Router = Router();
 router.post(
   "/",
   uploadLimiter,
+  optionalAuth,
   bookUploadFields,
   handleMulterError,
   validateFileSizes,
@@ -37,6 +39,7 @@ router.post(
 router.post(
   "/draft",
   uploadLimiter,
+  optionalAuth,
   bookUploadFields,
   handleMulterError,
   validateFileSizes,
@@ -46,7 +49,13 @@ router.post(
 /* ══════════════════════════════════════════
    GET /api/books — List books (paginated)
    ══════════════════════════════════════════ */
-router.get("/", ...listBooksRules, handleValidation, bookController.listBooks);
+router.get(
+  "/",
+  optionalAuth,
+  ...listBooksRules,
+  handleValidation,
+  bookController.listBooks,
+);
 
 /* ══════════════════════════════════════════
    GET /api/books/stats — Dashboard stats
@@ -69,6 +78,7 @@ router.get("/:id", ...validateId, handleValidation, bookController.getBookById);
 router.put(
   "/:id",
   uploadLimiter,
+  optionalAuth,
   bookUploadFields,
   handleMulterError,
   validateFileSizes,
@@ -93,6 +103,7 @@ router.patch(
    ══════════════════════════════════════════ */
 router.delete(
   "/:id",
+  optionalAuth,
   ...validateId,
   handleValidation,
   bookController.deleteBook,

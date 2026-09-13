@@ -4,6 +4,9 @@ import ApiResponse from "../utils/ApiResponse";
 import { cleanupUploadedFiles } from "../utils/helpers";
 import type { IMulterFiles, IBookListQuery } from "../types";
 
+const getRequesterId = (req: Request): string | undefined =>
+  (req as Request & { user?: { id?: string } }).user?.id;
+
 /**
  * POST /api/books — submit new book for review.
  */
@@ -14,7 +17,7 @@ export const createBook = async (
 ): Promise<void> => {
   try {
     const files = req.files as IMulterFiles | undefined;
-    const book = await bookService.createBook(req.body, files);
+    const book = await bookService.createBook(req.body, files, getRequesterId(req));
 
     ApiResponse.created(res, {
       data: book,
@@ -36,7 +39,7 @@ export const saveDraft = async (
 ): Promise<void> => {
   try {
     const files = req.files as IMulterFiles | undefined;
-    const draft = await bookService.saveDraft(req.body, files);
+    const draft = await bookService.saveDraft(req.body, files, getRequesterId(req));
 
     ApiResponse.created(res, {
       data: draft,
@@ -58,6 +61,15 @@ export const listBooks = async (
 ): Promise<void> => {
   try {
     const query = req.query as unknown as IBookListQuery;
+
+    // "mine" only ever resolves to the verified caller's own id — never a client-supplied
+    // userId — otherwise anyone could enumerate another user's drafts/rejected books.
+    if (req.query.mine === "true") {
+      query.userId = getRequesterId(req);
+    } else {
+      delete query.userId;
+    }
+
     const { books, total, page, limit } = await bookService.listBooks(query);
 
     ApiResponse.paginated(res, {
@@ -142,7 +154,12 @@ export const updateBook = async (
 ): Promise<void> => {
   try {
     const files = req.files as IMulterFiles | undefined;
-    const book = await bookService.updateBook(req.params.id, req.body, files);
+    const book = await bookService.updateBook(
+      req.params.id,
+      req.body,
+      files,
+      getRequesterId(req),
+    );
 
     ApiResponse.success(res, {
       data: book,
@@ -191,7 +208,7 @@ export const deleteBook = async (
   next: NextFunction,
 ): Promise<void> => {
   try {
-    const result = await bookService.deleteBook(req.params.id);
+    const result = await bookService.deleteBook(req.params.id, getRequesterId(req));
 
     ApiResponse.success(res, {
       data: result,

@@ -54,6 +54,7 @@ export type Category =
 
 export interface IBook extends Document {
   _id: Types.ObjectId;
+  userId?: string;
   title: string;
   slug: string;
   subtitle?: string;
@@ -120,6 +121,7 @@ export interface IBook extends Document {
    ═══════════════════════════════════ */
 
 export interface IBookCreateData {
+  userId?: string;
   title?: string;
   subtitle?: string;
   description?: string;
@@ -167,6 +169,7 @@ export interface IBookListQuery {
   category?: string;
   search?: string;
   author?: string;
+  userId?: string;
   language?: string;
   minPrice?: number;
   maxPrice?: number;
@@ -220,11 +223,44 @@ export interface IMulterFiles {
   qrCode?: Express.Multer.File[];
   manuscript?: Express.Multer.File[];
   samplePdf?: Express.Multer.File[];
+  video?: Express.Multer.File[];
   [fieldname: string]: Express.Multer.File[] | undefined;
 }
 
 export interface IBookRequest extends Request {
   files?: IMulterFiles;
+}
+
+/* ═══════════════════════════════════
+   CREATIVE VIDEOS (Pitch Alley / Ask the Universe)
+   ═══════════════════════════════════ */
+
+export type CreativeVideoSection = "pitch_alley" | "ask_universe";
+
+export interface ICreativeVideo extends Document {
+  _id: Types.ObjectId;
+  userId: string;
+  section: CreativeVideoSection;
+  title: string;
+  description?: string;
+  videoUrl: string;
+  videoSize: number;
+  views: number;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface ICreativeVideoCreateData {
+  userId: string;
+  section: CreativeVideoSection;
+  title: string;
+  description?: string;
+  videoUrl: string;
+  videoSize: number;
+}
+
+export interface ICreativeVideoListQuery {
+  section?: CreativeVideoSection;
 }
 
 export interface IPublicUser {
@@ -269,6 +305,8 @@ export interface IBookFilter {
   status?: BookStatus;
   category?: string;
   author?: { $regex: string; $options: string };
+  userId?: string;
+  $or?: Array<Record<string, unknown>>;
   language?: string;
   price?: { $gte?: number; $lte?: number };
   $text?: { $search: string };
