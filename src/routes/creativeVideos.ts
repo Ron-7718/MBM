@@ -17,6 +17,9 @@ import { handleValidation } from "../validators/bookValidator";
 
 const router: Router = Router();
 
+// Public home page preview. Keep this before /:id routes.
+router.get("/latest", creativeVideoController.getLatestPublicVideo);
+
 /* ══════════════════════════════════════════
    POST /api/creative-videos — upload a pitch / ask-the-universe video
    ══════════════════════════════════════════ */

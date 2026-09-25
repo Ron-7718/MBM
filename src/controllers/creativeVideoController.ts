@@ -56,6 +56,28 @@ export const listMyVideos = async (
   }
 };
 
+/** GET /api/creative-videos/latest?section=pitch_alley|ask_universe */
+export const getLatestPublicVideo = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const section = req.query.section as CreativeVideoSection;
+    if (section !== "pitch_alley" && section !== "ask_universe") {
+      throw ApiError.badRequest("Section must be pitch_alley or ask_universe");
+    }
+
+    const video = await creativeVideoService.getLatestPublicVideo(section);
+    ApiResponse.success(res, {
+      data: video,
+      message: video ? "Latest video retrieved successfully" : "No videos found",
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 /**
  * PUT /api/creative-videos/:id — update title/description.
  */

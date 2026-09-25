@@ -83,6 +83,14 @@ class CreativeVideoService {
       .lean();
   }
 
+  /** Most recent public video in a section, used by the home page previews. */
+  async getLatestPublicVideo(section: CreativeVideoSection): Promise<ICreativeVideo | null> {
+    return CreativeVideo.findOne({ section })
+      .sort({ createdAt: -1 })
+      .select("section title description videoUrl views createdAt updatedAt userId")
+      .lean();
+  }
+
   /**
    * UPDATE — edit title/description of an owned video.
    */
