@@ -14,7 +14,7 @@ const FILE_LIMITS = {
   qrCode: 2 * 1024 * 1024, // 2MB
   manuscript: 500 * 1024 * 1024, // 500MB
   sample: 20 * 1024 * 1024, // 20MB
-  video: 500 * 1024 * 1024, // 500MB
+  video: 100 * 1024 * 1024, // 100MB accepted on upload, compressed down to 25MB afterwards
 };
 
 const ALLOWED_IMAGE_TYPES = [

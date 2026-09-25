@@ -218,3 +218,29 @@ export const deleteBook = async (
     next(error);
   }
 };
+
+/**
+ * POST /api/books/:id/like — toggle the requester's like on a book.
+ */
+export const toggleLike = async (
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> => {
+  try {
+    const userId = getRequesterId(req);
+    if (!userId) {
+      ApiResponse.error(res, { statusCode: 403, message: "You must be logged in to like a book" });
+      return;
+    }
+
+    const result = await bookService.toggleLike(req.params.id, userId);
+
+    ApiResponse.success(res, {
+      data: result,
+      message: result.liked ? "Book liked" : "Book unliked",
+    });
+  } catch (error) {
+    next(error);
+  }
+};

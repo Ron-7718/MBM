@@ -194,6 +194,7 @@ const bookSchema = new Schema<IBook>(
     approvedAt: { type: Date, default: null },
     viewCount: { type: Number, default: 0 },
     downloadCount: { type: Number, default: 0 },
+    likedBy: { type: [String], default: [] },
   },
   {
     timestamps: true,

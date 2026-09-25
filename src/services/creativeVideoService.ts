@@ -1,14 +1,16 @@
 import CreativeVideo from "../models/CreativeVideo";
 import ApiError from "../utils/ApiError";
 import { getFileUrl, deleteFile } from "../utils/helpers";
+import { compressVideoIfNeeded, COMPRESSED_VIDEO_MAX_BYTES } from "../utils/videoCompressor";
 import type { CreativeVideoSection, ICreativeVideo } from "../types";
 
 const VALID_SECTIONS: CreativeVideoSection[] = ["pitch_alley", "ask_universe"];
 
 class CreativeVideoService {
   /**
-   * UPLOAD — a creative posts their pitch / ask-the-universe video (max 500MB,
-   * enforced by the upload middleware before this ever runs). Each creative may
+   * UPLOAD — a creative posts their pitch / ask-the-universe video (max 100MB
+   * accepted, then compressed down to ~25MB, enforced by the upload middleware
+   * and `compressVideoIfNeeded` before this ever runs). Each creative may
    * only have one video per section — uploading again replaces the old one.
    */
   async uploadVideo(
@@ -26,14 +28,19 @@ class CreativeVideoService {
       );
     }
 
+    const compressedFile = await compressVideoIfNeeded(
+      file,
+      COMPRESSED_VIDEO_MAX_BYTES,
+    );
+
     const existing = await CreativeVideo.findOne({ userId, section });
 
     if (existing) {
       deleteFile(existing.videoUrl);
       existing.title = body.title as string;
       existing.description = (body.description as string) || undefined;
-      existing.videoUrl = getFileUrl(file) as string;
-      existing.videoSize = file.size;
+      existing.videoUrl = getFileUrl(compressedFile) as string;
+      existing.videoSize = compressedFile.size;
       existing.views = 0;
       return await existing.save();
     }
@@ -43,13 +50,12 @@ class CreativeVideoService {
       section,
       title: body.title,
       description: body.description || undefined,
-      videoUrl: getFileUrl(file),
-      videoSize: file.size,
+      videoUrl: getFileUrl(compressedFile),
+      videoSize: compressedFile.size,
     });
 
     return await video.save();
   }
-
   /**
    * LIST — the logged-in creative's own videos, optionally filtered by section.
    */

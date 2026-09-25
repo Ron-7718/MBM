@@ -311,6 +311,32 @@ class BookService {
   }
 
   /**
+   * LIKE / UNLIKE — toggles the requesting user's like on a book.
+   */
+  async toggleLike(
+    id: string,
+    userId: string,
+  ): Promise<{ liked: boolean; likeCount: number }> {
+    const book = await Book.findById(id).select("likedBy");
+    if (!book) throw ApiError.notFound("Book not found");
+
+    const alreadyLiked = book.likedBy.includes(userId);
+
+    const updated = await Book.findByIdAndUpdate(
+      id,
+      alreadyLiked
+        ? { $pull: { likedBy: userId } }
+        : { $addToSet: { likedBy: userId } },
+      { new: true },
+    ).select("likedBy");
+
+    return {
+      liked: !alreadyLiked,
+      likeCount: updated?.likedBy.length ?? 0,
+    };
+  }
+
+  /**
    * STATS — aggregate dashboard statistics.
    */
   async getStats(): Promise<IBookStats> {

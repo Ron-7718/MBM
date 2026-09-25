@@ -6,13 +6,15 @@ import {
   handleMulterError,
 } from "../middleware/upload";
 import { uploadLimiter } from "../middleware/rateLimiter";
-import { optionalAuth } from "../middleware/auth";
+import { optionalAuth, requireAuth } from "../middleware/auth";
+import * as commentController from "../controllers/commentController";
 import {
   submitBookRules,
   updateBookRules,
   listBooksRules,
   validateId,
   updateStatusRules,
+  commentRules,
   handleValidation,
 } from "../validators/bookValidator";
 
@@ -107,6 +109,38 @@ router.delete(
   ...validateId,
   handleValidation,
   bookController.deleteBook,
+);
+
+/* ══════════════════════════════════════════
+   POST /api/books/:id/like — Toggle like
+   ══════════════════════════════════════════ */
+router.post(
+  "/:id/like",
+  requireAuth,
+  ...validateId,
+  handleValidation,
+  bookController.toggleLike,
+);
+
+/* ══════════════════════════════════════════
+   GET /api/books/:id/comments — List comments
+   ══════════════════════════════════════════ */
+router.get(
+  "/:id/comments",
+  ...validateId,
+  handleValidation,
+  commentController.listComments,
+);
+
+/* ══════════════════════════════════════════
+   POST /api/books/:id/comments — Add a comment
+   ══════════════════════════════════════════ */
+router.post(
+  "/:id/comments",
+  requireAuth,
+  ...commentRules,
+  handleValidation,
+  commentController.addComment,
 );
 
 export default router;

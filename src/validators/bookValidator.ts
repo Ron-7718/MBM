@@ -133,6 +133,20 @@ export const validateId: ValidationChain[] = [
 ];
 
 /* ══════════════════════════════
+   COMMENTS (POST /api/books/:id/comments)
+   ══════════════════════════════ */
+
+export const commentRules: ValidationChain[] = [
+  param("id").isMongoId().withMessage("Invalid book ID format"),
+  body("text")
+    .trim()
+    .notEmpty()
+    .withMessage("Comment text is required")
+    .isLength({ max: 1000 })
+    .withMessage("Comment cannot exceed 1000 characters"),
+];
+
+/* ══════════════════════════════
    STATUS CHANGE (PATCH /api/books/:id/status)
    ══════════════════════════════ */
 

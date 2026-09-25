@@ -101,6 +101,7 @@ export interface IBook extends Document {
   approvedAt?: Date | null;
   viewCount: number;
   downloadCount: number;
+  likedBy: string[];
 
   createdAt: Date;
   updatedAt: Date;
@@ -263,6 +264,20 @@ export interface ICreativeVideoListQuery {
   section?: CreativeVideoSection;
 }
 
+/* ═══════════════════════════════════
+   COMMENTS (on books)
+   ═══════════════════════════════════ */
+
+export interface IComment extends Document {
+  _id: Types.ObjectId;
+  bookId: string;
+  userId: string;
+  userName?: string;
+  text: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface IPublicUser {
   _id: string;
   name?: string;
@@ -332,4 +347,7 @@ export interface IPublicUser {
   gender?: string;
   createdAt: Date;
   bookCount: number;
+  views: number;
+  likes: number;
+  comments: number;
 }

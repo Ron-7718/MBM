@@ -1,6 +1,7 @@
 import { UserStepModel } from "../models/authModel";
 import Book from "../models/Book";
 import CreativeVideo from "../models/CreativeVideo";
+import Comment from "../models/Comment";
 import ApiError from "../utils/ApiError";
 import type {
   IUserListQuery,
@@ -9,6 +10,35 @@ import type {
 
 // Only these fields are exposed publicly
 const PUBLIC_FIELDS = "name role gender createdAt";
+
+/**
+ * Aggregates a creator's public stats (works/views/likes/comments) across
+ * their approved books only — drafts/pending/rejected books stay invisible.
+ */
+async function getCreatorStats(userId: string): Promise<{
+  bookCount: number;
+  views: number;
+  likes: number;
+  comments: number;
+}> {
+  const approvedBooks = await Book.find({ userId, status: "approved" })
+    .select("_id viewCount likedBy")
+    .lean();
+
+  const bookCount = approvedBooks.length;
+  const views = approvedBooks.reduce((sum, b) => sum + (b.viewCount || 0), 0);
+  const likes = approvedBooks.reduce(
+    (sum, b) => sum + (b.likedBy?.length || 0),
+    0,
+  );
+
+  const bookIds = approvedBooks.map((b) => b._id.toString());
+  const comments = bookIds.length
+    ? await Comment.countDocuments({ bookId: { $in: bookIds } })
+    : 0;
+
+  return { bookCount, views, likes, comments };
+}
 
 /**
  * LIST — public directory of creators
@@ -63,10 +93,7 @@ export const listAuthors = async (
 
   const users: IPublicUser[] = await Promise.all(
     records.map(async (record) => {
-      const bookCount = await Book.countDocuments({
-        author: record.name,
-        status: "approved",
-      });
+      const stats = await getCreatorStats(record._id.toString());
 
       return {
         _id: record._id.toString(),
@@ -74,7 +101,10 @@ export const listAuthors = async (
         role: record.role,
         gender: record.gender,
         createdAt: record.createdAt,
-        bookCount,
+        bookCount: stats.bookCount,
+        views: stats.views,
+        likes: stats.likes,
+        comments: stats.comments,
       };
     }),
   );
@@ -115,11 +145,11 @@ export const getPublicProfileById = async (
   }
 
   const bookFilter = {
-    author: record.name,
+    userId: record._id.toString(),
     status: "approved",
   };
 
-  const [books, bookCount, pitchVideos, universeVideos] = await Promise.all([
+  const [books, stats, pitchVideos, universeVideos] = await Promise.all([
     Book.find(bookFilter)
       .select(
         "title slug frontCover category price createdAt viewCount",
@@ -128,7 +158,7 @@ export const getPublicProfileById = async (
       .limit(24)
       .lean(),
 
-    Book.countDocuments(bookFilter),
+    getCreatorStats(record._id.toString()),
 
     // Videos this creative has posted to Pitch Alley / Ask the Universe —
     // shown on their public profile whenever a visitor views it.
@@ -150,10 +180,13 @@ export const getPublicProfileById = async (
       role: record.role,
       gender: record.gender,
       createdAt: record.createdAt,
-      bookCount,
+      bookCount: stats.bookCount,
+      views: stats.views,
+      likes: stats.likes,
+      comments: stats.comments,
     },
     books,
-    bookCount,
+    bookCount: stats.bookCount,
     pitchVideos,
     universeVideos,
   };
