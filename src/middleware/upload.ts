@@ -45,6 +45,7 @@ const FOLDER_MAP: Record<string, string> = {
   manuscript: "manuscripts",
   samplePdf: "samples",
   video: "videos",
+  image: "community-posts",
 };
 
 /* ─────────────────────────────
@@ -79,12 +80,15 @@ const fileFilter = (
   file: Express.Multer.File,
   cb: FileFilterCallback,
 ): void => {
-  const imageFields = ["frontCover", "backCover", "qrCode"];
+  const imageFields = ["frontCover", "backCover", "qrCode", "image"];
   const pdfFields = ["manuscript", "samplePdf"];
   const videoFields = ["video"];
 
   if (imageFields.includes(file.fieldname)) {
-    if (ALLOWED_IMAGE_TYPES.includes(file.mimetype)) {
+    const allowedTypes = file.fieldname === "image"
+      ? ["image/jpeg", "image/png", "image/webp"]
+      : ALLOWED_IMAGE_TYPES;
+    if (allowedTypes.includes(file.mimetype)) {
       return cb(null, true);
     }
     return cb(
@@ -146,6 +150,14 @@ export const bookUploadFields = upload.fields([
 ───────────────────────────── */
 
 export const videoUploadField = upload.single("video");
+
+const communityImageUpload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+});
+
+export const communityPostImageField = communityImageUpload.single("image");
 
 export const validateVideoSize = (
   req: Request,

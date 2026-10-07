@@ -264,6 +264,18 @@ export interface ICreativeVideoListQuery {
   section?: CreativeVideoSection;
 }
 
+export interface ICommunityPost extends Document {
+  _id: Types.ObjectId;
+  userId: string;
+  userName: string;
+  title: string;
+  description: string;
+  imageUrl: string;
+  likedBy: string[];
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 /* ═══════════════════════════════════
    COMMENTS (on books)
    ═══════════════════════════════════ */

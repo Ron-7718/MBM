@@ -11,6 +11,7 @@ import subcategoryRouter from "./routes/subcategories";
 import adminAuthRouter from "./routes/adminAuth";
 import creativeVideoRouter from "./routes/creativeVideos";
 import searchRouter from "./routes/search";
+import communityPostsRouter from "./routes/communityPosts";
 import { corsMiddleware } from "./middleware/cors";
 import { apiLimiter } from "./middleware/rateLimiter";
 import { errorHandler, notFound } from "./middleware/errorHandler";
@@ -46,6 +47,7 @@ app.use("/api/categories", categoryRouter);
 app.use("/api/subcategories", subcategoryRouter);
 app.use("/api/creative-videos", creativeVideoRouter);
 app.use("/api/search", searchRouter);
+app.use("/api/community-posts", communityPostsRouter);
 
 // Error handling middleware
 app.use(errorHandler);
