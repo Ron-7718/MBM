@@ -9,6 +9,7 @@
     "build": "tsc -p tsconfig.json",
     "start": "node dist/server.js",
     "type-check": "tsc --noEmit",
+    "migrate:uploads": "ts-node -r dotenv/config src/utils/migrateUploadsToGridFs.ts",
     "seed:tags": "ts-node -r dotenv/config src/utils/seedCategoriesAndTags.ts"
   },
   "dependencies": {
@@ -41,7 +42,7 @@
     "typescript": "^5.3.2"
   },
   "engines": {
-    "node": ">=18.0.0",
+    "node": ">=22.0.0",
     "npm": ">=9.0.0"
   }
 }

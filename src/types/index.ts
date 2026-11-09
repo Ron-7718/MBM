@@ -228,9 +228,9 @@ export interface IMulterFiles {
   [fieldname: string]: Express.Multer.File[] | undefined;
 }
 
-export interface IBookRequest extends Request {
+export type IBookRequest = Omit<Request, "files"> & {
   files?: IMulterFiles;
-}
+};
 
 /* ═══════════════════════════════════
    CREATIVE VIDEOS (Pitch Alley / Ask the Universe)
@@ -290,16 +290,6 @@ export interface IComment extends Document {
   updatedAt: Date;
 }
 
-export interface IPublicUser {
-  _id: string;
-  name?: string;
-  role?: string;
-  gender?: string;
-  createdAt?: Date;
-}
-
-
-
 /* ═══════════════════════════════════
    CONFIG
    ═══════════════════════════════════ */
@@ -344,6 +334,12 @@ export interface IBookFilter {
    ═══════════════════════════════════ */
 
 export type PublicRole = "author" | "writer";
+export type SocialPlatform = "website" | "instagram" | "x" | "youtube" | "tiktok" | "goodreads";
+
+export interface IUserSocialLink {
+  platform: SocialPlatform;
+  url: string;
+}
 
 export interface IUserListQuery {
   page?: number;
@@ -357,6 +353,11 @@ export interface IPublicUser {
   name?: string;
   role?: string;
   gender?: string;
+  bio?: string;
+  avatarUrl?: string;
+  craft?: string;
+  location?: string;
+  socialLinks?: IUserSocialLink[];
   createdAt: Date;
   bookCount: number;
   views: number;

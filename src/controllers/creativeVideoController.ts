@@ -2,7 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import creativeVideoService from "../services/creativeVideoService";
 import ApiResponse from "../utils/ApiResponse";
 import ApiError from "../utils/ApiError";
-import { deleteFile, getFileUrl } from "../utils/helpers";
+import { cleanupUploadedFile } from "../utils/helpers";
 import type { CreativeVideoSection } from "../types";
 
 const getRequesterId = (req: Request): string | undefined =>
@@ -27,7 +27,7 @@ export const uploadVideo = async (
       message: "Video uploaded successfully",
     });
   } catch (error) {
-    if (req.file) deleteFile(getFileUrl(req.file));
+    if (req.file) await cleanupUploadedFile(req.file);
     next(error);
   }
 };

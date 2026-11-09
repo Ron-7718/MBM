@@ -24,7 +24,7 @@ export const createBook = async (
       message: "Book submitted successfully for review",
     });
   } catch (error) {
-    cleanupUploadedFiles(req.files as IMulterFiles | undefined);
+    await cleanupUploadedFiles(req.files as IMulterFiles | undefined);
     next(error);
   }
 };
@@ -46,7 +46,7 @@ export const saveDraft = async (
       message: "Draft saved successfully",
     });
   } catch (error) {
-    cleanupUploadedFiles(req.files as IMulterFiles | undefined);
+    await cleanupUploadedFiles(req.files as IMulterFiles | undefined);
     next(error);
   }
 };
@@ -166,7 +166,7 @@ export const updateBook = async (
       message: "Book updated successfully",
     });
   } catch (error) {
-    cleanupUploadedFiles(req.files as IMulterFiles | undefined);
+    await cleanupUploadedFiles(req.files as IMulterFiles | undefined);
     next(error);
   }
 };

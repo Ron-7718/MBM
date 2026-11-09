@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction } from "express";
 import communityPostService from "../services/communityPostService";
 import ApiResponse from "../utils/ApiResponse";
 import ApiError from "../utils/ApiError";
+import { cleanupUploadedFile } from "../utils/helpers";
 
 const requester = (req: Request): string | undefined => (req as Request & { user?: { id?: string } }).user?.id;
 
@@ -11,7 +12,10 @@ export const create = async (req: Request, res: Response, next: NextFunction) =>
     if (!userId) throw ApiError.forbidden("You must be logged in to post");
     const post = await communityPostService.create(req.body, req.file, userId);
     ApiResponse.created(res, { data: post, message: "Post created successfully" });
-  } catch (error) { next(error); }
+  } catch (error) {
+    await cleanupUploadedFile(req.file);
+    next(error);
+  }
 };
 
 export const list = async (req: Request, res: Response, next: NextFunction) => {

@@ -2,6 +2,8 @@ import CreativeVideo from "../models/CreativeVideo";
 import ApiError from "../utils/ApiError";
 import { getFileUrl, deleteFile } from "../utils/helpers";
 import { compressVideoIfNeeded, COMPRESSED_VIDEO_MAX_BYTES } from "../utils/videoCompressor";
+import { saveLocalFileToGridFs, usesGridFsStorage } from "../utils/gridFsStorage";
+import fs from "fs";
 import type { CreativeVideoSection, ICreativeVideo } from "../types";
 
 const VALID_SECTIONS: CreativeVideoSection[] = ["pitch_alley", "ask_universe"];
@@ -22,7 +24,7 @@ class CreativeVideoService {
 
     const section = body.section as CreativeVideoSection;
     if (!VALID_SECTIONS.includes(section)) {
-      deleteFile(getFileUrl(file));
+      await fs.promises.unlink(file.path).catch(() => undefined);
       throw ApiError.badRequest(
         "Invalid section — must be pitch_alley or ask_universe",
       );
@@ -32,6 +34,19 @@ class CreativeVideoService {
       file,
       COMPRESSED_VIDEO_MAX_BYTES,
     );
+
+    if (usesGridFsStorage()) {
+      const filename = compressedFile.filename;
+      const { size } = await saveLocalFileToGridFs(
+        compressedFile.path,
+        "videos",
+        filename,
+        compressedFile.mimetype,
+      );
+      await fs.promises.unlink(compressedFile.path).catch(() => undefined);
+      compressedFile.path = `/uploads/videos/${filename}`;
+      compressedFile.size = size;
+    }
 
     const existing = await CreativeVideo.findOne({ userId, section });
 

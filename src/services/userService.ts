@@ -3,13 +3,67 @@ import Book from "../models/Book";
 import CreativeVideo from "../models/CreativeVideo";
 import Comment from "../models/Comment";
 import ApiError from "../utils/ApiError";
+import { deleteFile } from "../utils/helpers";
 import type {
   IUserListQuery,
   IPublicUser,
+  IUserSocialLink,
 } from "../types";
 
+const toPublicSocialLinks = (
+  links?: Array<{ platform: string; url: string }>,
+): IUserSocialLink[] | undefined =>
+  links?.map((link) => ({
+    platform: link.platform as IUserSocialLink["platform"],
+    url: link.url,
+  }));
+
 // Only these fields are exposed publicly
-const PUBLIC_FIELDS = "name role gender createdAt";
+const PUBLIC_FIELDS = "name role gender createdAt bio avatarUrl craft location socialLinks";
+
+export interface IUpdateProfileInput {
+  name: string;
+  dob: string;
+  gender: string;
+  bio?: string;
+  avatarUrl?: string;
+  craft?: string;
+  location?: string;
+  socialLinks: IUserSocialLink[];
+}
+
+const MY_PROFILE_FIELDS = "identifier name dob gender role step bio avatarUrl craft location socialLinks createdAt updatedAt";
+
+export const getMyProfileById = async (id: string) => {
+  const user = await UserStepModel.findById(id).select(MY_PROFILE_FIELDS).lean();
+  if (!user) throw ApiError.notFound("Profile not found");
+  return user;
+};
+
+export const updateMyProfileById = async (id: string, input: IUpdateProfileInput) => {
+  const user = await UserStepModel.findById(id).select(MY_PROFILE_FIELDS);
+  if (!user) throw ApiError.notFound("Profile not found");
+
+  user.name = input.name.trim();
+  user.dob = input.dob;
+  user.gender = input.gender;
+  user.bio = input.bio?.trim() ?? "";
+  const previousAvatarUrl = user.avatarUrl;
+  user.avatarUrl = input.avatarUrl?.trim() ?? "";
+  user.craft = input.craft?.trim() ?? "";
+  user.location = input.location?.trim() ?? "";
+  user.socialLinks = input.socialLinks.map((link) => ({
+    platform: link.platform,
+    url: link.url.trim(),
+  }));
+  await user.save();
+
+  if (previousAvatarUrl && previousAvatarUrl !== user.avatarUrl && previousAvatarUrl.startsWith("/uploads/profile-photos/")) {
+    deleteFile(previousAvatarUrl);
+  }
+
+  return user.toObject();
+};
 
 /**
  * Aggregates a creator's public stats (works/views/likes/comments) across
@@ -100,6 +154,11 @@ export const listAuthors = async (
         name: record.name,
         role: record.role,
         gender: record.gender,
+        bio: record.bio,
+        avatarUrl: record.avatarUrl,
+        craft: record.craft,
+        location: record.location,
+        socialLinks: toPublicSocialLinks(record.socialLinks),
         createdAt: record.createdAt,
         bookCount: stats.bookCount,
         views: stats.views,
@@ -179,6 +238,11 @@ export const getPublicProfileById = async (
       name: record.name,
       role: record.role,
       gender: record.gender,
+      bio: record.bio,
+      avatarUrl: record.avatarUrl,
+      craft: record.craft,
+      location: record.location,
+      socialLinks: toPublicSocialLinks(record.socialLinks),
       createdAt: record.createdAt,
       bookCount: stats.bookCount,
       views: stats.views,

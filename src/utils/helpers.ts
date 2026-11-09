@@ -1,6 +1,11 @@
 import fs from "fs";
 import path from "path";
 import type { IMulterFiles } from "../types";
+import { getUploadedFilePath } from "./uploadStorage";
+import {
+  removeGridFsFile,
+  usesGridFsStorage,
+} from "./gridFsStorage";
 
 /**
  * Build a URL-safe relative file path from a multer file object.
@@ -44,22 +49,43 @@ export const parseBool = (val: unknown): boolean => {
  */
 export const deleteFile = (filePath?: string | null): void => {
   if (!filePath) return;
-  const fullPath = filePath.startsWith("/uploads")
-    ? path.join(__dirname, "..", filePath)
-    : filePath;
-  fs.unlink(fullPath, () => {});
+  const normalized = filePath.replace(/\\/g, "/");
+  if (normalized.startsWith("/uploads/")) {
+    const relativePath = normalized.slice("/uploads/".length);
+    const [folder, filename] = relativePath.split("/");
+    if (usesGridFsStorage() && folder && filename) {
+      void removeGridFsFile(folder, filename).catch(() => undefined);
+    }
+
+    const fullPath = getUploadedFilePath(relativePath);
+    if (fullPath) fs.unlink(fullPath, () => {});
+    return;
+  }
+
+  fs.unlink(filePath, () => {});
+};
+
+export const cleanupUploadedFile = async (
+  file?: Express.Multer.File,
+): Promise<void> => {
+  if (!file?.path) return;
+  const normalized = file.path.replace(/\\/g, "/");
+  const match = normalized.match(/^\/uploads\/([^/]+)\/([^/]+)$/);
+  if (match && usesGridFsStorage()) {
+    await removeGridFsFile(match[1], match[2]).catch(() => undefined);
+    return;
+  }
+
+  await fs.promises.unlink(file.path).catch(() => undefined);
 };
 
 /**
  * Cleanup all multer-uploaded files after a failed request.
  */
-export const cleanupUploadedFiles = (reqFiles?: IMulterFiles): void => {
+export const cleanupUploadedFiles = async (reqFiles?: IMulterFiles): Promise<void> => {
   if (!reqFiles) return;
-  Object.values(reqFiles).forEach((fileArr) => {
-    fileArr?.forEach((file) => {
-      fs.unlink(file.path, () => {});
-    });
-  });
+  const files = Object.values(reqFiles).flatMap((fileArr) => fileArr ?? []);
+  await Promise.all(files.map((file) => cleanupUploadedFile(file)));
 };
 
 /**

@@ -106,6 +106,12 @@ export async function verifyOtp(req: Request, res: Response) {
             gender: record.gender,
             role: record.role,
             step: record.step,
+            bio: record.bio,
+            avatarUrl: record.avatarUrl,
+            craft: record.craft,
+            location: record.location,
+            socialLinks: record.socialLinks ?? [],
+            createdAt: record.createdAt,
           },
         },
       });

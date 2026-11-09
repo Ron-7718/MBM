@@ -1,5 +1,4 @@
 import express from "express";
-import cors from "cors";
 import dotenv from "dotenv";
 import mongoose from "mongoose";
 import healthRouter from "./routes/health";
@@ -15,30 +14,122 @@ import communityPostsRouter from "./routes/communityPosts";
 import { corsMiddleware } from "./middleware/cors";
 import { apiLimiter } from "./middleware/rateLimiter";
 import { errorHandler, notFound } from "./middleware/errorHandler";
-import path from "path";
+import dns from "node:dns";
+import { UPLOAD_ROOT } from "./utils/uploadStorage";
+import {
+  findGridFsFile,
+  getGridFsBucket,
+  usesGridFsStorage,
+} from "./utils/gridFsStorage";
 
-// Load environment variables
+dns.setServers(["8.8.8.8", "8.8.4.4"]);
+
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 4000;
 
-// Middleware
+// Reuse the connection across requests handled by the same Vercel instance.
+let mongoConnection: Promise<typeof mongoose> | null = null;
+
+const connectToMongo = (): Promise<typeof mongoose> => {
+  if (mongoose.connection.readyState === 1) return Promise.resolve(mongoose);
+
+  if (!process.env.MONGODB_URI) {
+    return Promise.reject(new Error("MONGODB_URI is not configured"));
+  }
+
+  if (!mongoConnection) {
+    mongoConnection = mongoose
+      .connect(process.env.MONGODB_URI, { serverSelectionTimeoutMS: 10000 })
+      .catch((error) => {
+        mongoConnection = null;
+        throw error;
+      });
+  }
+
+  return mongoConnection;
+};
+
 app.use(corsMiddleware);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(apiLimiter);
 
-// Basic test route
-app.get("/", (req, res) => {
+app.get("/", (_req, res) => {
   res.json({ message: "MeBookMeta Backend is running!" });
 });
 
-// Serve uploads folder
-app.use("/uploads", express.static(path.join(process.cwd(), "uploads")));
-
-// Routes
+// Health stays usable during database outages; all data routes wait for Mongo.
 app.use("/api/health", healthRouter);
+app.use(async (_req, res, next) => {
+  try {
+    await connectToMongo();
+    next();
+  } catch (error) {
+    console.error("MongoDB connection error:", error);
+    res.status(503).json({
+      success: false,
+      message: "Database is unavailable. Check the MONGODB_URI configuration.",
+    });
+  }
+});
+
+// Local disk uploads work for local development and persistent Node hosts.
+// Vercel deployments need object storage for uploaded files.
+app.use("/uploads", express.static(UPLOAD_ROOT));
+app.get("/uploads/:folder/:filename", async (req, res, next) => {
+  if (!usesGridFsStorage()) return next();
+
+  try {
+    const { folder, filename } = req.params;
+    const file = await findGridFsFile(folder, filename);
+    if (!file) return next();
+
+    const size = file.length;
+    const range = req.header("range")?.match(/^bytes=(\d*)-(\d*)$/);
+    let start: number | undefined;
+    let end: number | undefined;
+
+    if (range) {
+      if (range[1]) {
+        start = Number(range[1]);
+        end = range[2] ? Number(range[2]) : size - 1;
+      } else {
+        const suffixLength = Number(range[2]);
+        start = Math.max(0, size - suffixLength);
+        end = size - 1;
+      }
+
+      if (start >= size || end < start) {
+        res.setHeader("Content-Range", `bytes */${size}`);
+        return res.status(416).end();
+      }
+      end = Math.min(end, size - 1);
+      res.status(206);
+      res.setHeader("Content-Range", `bytes ${start}-${end}/${size}`);
+      res.setHeader("Content-Length", end - start + 1);
+    } else {
+      res.setHeader("Content-Length", size);
+    }
+
+    res.setHeader("Accept-Ranges", "bytes");
+    res.setHeader(
+      "Content-Type",
+      file.metadata?.contentType || "application/octet-stream",
+    );
+
+    const stream = getGridFsBucket().openDownloadStream(file._id, {
+      ...(start !== undefined ? { start } : {}),
+      ...(end !== undefined ? { end: end + 1 } : {}),
+    });
+    stream.on("error", next);
+    stream.pipe(res);
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.use("/api/auth", authRouter);
 app.use("/api/users", userRouter);
 app.use("/api/books", bookRouter);
@@ -49,44 +140,20 @@ app.use("/api/creative-videos", creativeVideoRouter);
 app.use("/api/search", searchRouter);
 app.use("/api/community-posts", communityPostsRouter);
 
-// Error handling middleware
 app.use(errorHandler);
-
-// 404 handler
 app.use(notFound);
 
-// Reconnection visibility — queries otherwise silently buffer until they time out.
 mongoose.connection.on("disconnected", () =>
-  console.warn("⚠️ MongoDB disconnected — queries will buffer until reconnected"),
+  console.warn("MongoDB disconnected; the next request will reconnect."),
 );
-mongoose.connection.on("reconnected", () => console.log("✅ MongoDB reconnected"));
-mongoose.connection.on("error", (err) => console.error("MongoDB connection error:", err));
+mongoose.connection.on("reconnected", () => console.log("MongoDB reconnected"));
+mongoose.connection.on("error", (error) =>
+  console.error("MongoDB connection error:", error),
+);
 
-// Database connection must be ready before the server accepts requests,
-// otherwise early requests buffer and fail with a timeout error.
-const start = async (): Promise<void> => {
-  const MONGO_URI = process.env.MONGODB_URI;
-
-  if (MONGO_URI) {
-    try {
-      await mongoose.connect(MONGO_URI, {
-        serverSelectionTimeoutMS: 10000,
-      });
-      console.log("✅ Connected to MongoDB");
-    } catch (err) {
-      console.error("❌ MongoDB connection error:", err);
-      process.exit(1);
-    }
-  } else {
-    console.warn("⚠️ MONGO_URI is not set. Skipping MongoDB connection.");
-  }
-
-  app.listen(PORT, () => {
-    console.log(`🚀 Server running on port ${PORT}`);
-  });
-};
-
-start();
-
+// Vercel imports the default app export; local npm start still opens a port.
+if (require.main === module) {
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
 
 export default app;

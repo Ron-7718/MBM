@@ -1,9 +1,17 @@
 import multer, { type FileFilterCallback } from "multer";
 import path from "path";
+import os from "os";
 import fs from "fs";
 import { v4 as uuidv4 } from "uuid";
 import type { Request, Response, NextFunction } from "express";
 import ApiError from "../utils/ApiError";
+import { cleanupUploadedFile } from "../utils/helpers";
+import { UPLOAD_ROOT } from "../utils/uploadStorage";
+import {
+  removeGridFsFile,
+  usesGridFsStorage,
+  writeToGridFs,
+} from "../utils/gridFsStorage";
 
 /* ─────────────────────────────
    File Limits (Hardcoded)
@@ -46,16 +54,30 @@ const FOLDER_MAP: Record<string, string> = {
   samplePdf: "samples",
   video: "videos",
   image: "community-posts",
+  avatar: "profile-photos",
+};
+
+const uploadExtension = (file: Express.Multer.File): string => {
+  if (file.fieldname !== "avatar") return path.extname(file.originalname).toLowerCase();
+  const avatarExtensions: Record<string, string> = {
+    "image/jpeg": ".jpg",
+    "image/png": ".png",
+    "image/webp": ".webp",
+  };
+  return avatarExtensions[file.mimetype] ?? ".img";
 };
 
 /* ─────────────────────────────
    Storage Engine
 ───────────────────────────── */
 
-const storage = multer.diskStorage({
+const diskStorage = multer.diskStorage({
   destination: (_req, file, cb) => {
     const folder = FOLDER_MAP[file.fieldname] ?? "others";
-    const uploadPath = path.join(process.cwd(), "uploads", folder);
+    const root = usesGridFsStorage() && file.fieldname === "video"
+      ? path.join(os.tmpdir(), "mbm-uploads")
+      : UPLOAD_ROOT;
+    const uploadPath = path.join(root, folder);
 
     // Auto-create folder if missing
     if (!fs.existsSync(uploadPath)) {
@@ -66,10 +88,40 @@ const storage = multer.diskStorage({
   },
 
   filename: (_req, file, cb) => {
-    const ext = path.extname(file.originalname).toLowerCase();
+    const ext = uploadExtension(file);
     cb(null, `${uuidv4()}${ext}`);
   },
 });
+
+const storage: multer.StorageEngine = {
+  _handleFile: (req, file, cb) => {
+    if (!usesGridFsStorage() || file.fieldname === "video") {
+      return diskStorage._handleFile(req, file, cb);
+    }
+
+    const folder = FOLDER_MAP[file.fieldname] ?? "others";
+    const filename = `${uuidv4()}${uploadExtension(file)}`;
+    const publicPath = `/uploads/${folder}/${filename}`;
+
+    writeToGridFs(file.stream, folder, filename, file.mimetype)
+      .then(({ size }) => cb(null, {
+        destination: "",
+        filename,
+        path: publicPath,
+        size,
+      }))
+      .catch((error: Error) => cb(error));
+  },
+
+  _removeFile: (req, file, cb) => {
+    const match = file.path?.replace(/\\/g, "/").match(/^\/uploads\/([^/]+)\/([^/]+)$/);
+    if (!match || !usesGridFsStorage()) {
+      return diskStorage._removeFile(req, file, cb);
+    }
+
+    removeGridFsFile(match[1], match[2]).then(() => cb(null)).catch(cb);
+  },
+};
 
 /* ─────────────────────────────
    File Filter
@@ -80,12 +132,12 @@ const fileFilter = (
   file: Express.Multer.File,
   cb: FileFilterCallback,
 ): void => {
-  const imageFields = ["frontCover", "backCover", "qrCode", "image"];
+  const imageFields = ["frontCover", "backCover", "qrCode", "image", "avatar"];
   const pdfFields = ["manuscript", "samplePdf"];
   const videoFields = ["video"];
 
   if (imageFields.includes(file.fieldname)) {
-    const allowedTypes = file.fieldname === "image"
+    const allowedTypes = file.fieldname === "image" || file.fieldname === "avatar"
       ? ["image/jpeg", "image/png", "image/webp"]
       : ALLOWED_IMAGE_TYPES;
     if (allowedTypes.includes(file.mimetype)) {
@@ -159,6 +211,14 @@ const communityImageUpload = multer({
 
 export const communityPostImageField = communityImageUpload.single("image");
 
+const profilePhotoUpload = multer({
+  storage,
+  fileFilter,
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+});
+
+export const profilePhotoUploadField = profilePhotoUpload.single("avatar");
+
 export const validateVideoSize = (
   req: Request,
   _res: Response,
@@ -185,11 +245,11 @@ export const validateVideoSize = (
    Per-field Size Validation
 ───────────────────────────── */
 
-export const validateFileSizes = (
+export const validateFileSizes = async (
   req: Request,
   _res: Response,
   next: NextFunction,
-): void => {
+): Promise<void> => {
   const files = req.files as Record<string, Express.Multer.File[]> | undefined;
   if (!files) return next();
 
@@ -202,6 +262,7 @@ export const validateFileSizes = (
   };
 
   const errors: string[] = [];
+  const invalidFiles: Express.Multer.File[] = [];
 
   for (const field in files) {
     for (const file of files[field]) {
@@ -215,12 +276,13 @@ export const validateFileSizes = (
           `${field}: File size ${actualMB}MB exceeds limit of ${limitMB}MB`,
         );
 
-        fs.unlink(file.path, () => {});
+        invalidFiles.push(file);
       }
     }
   }
 
   if (errors.length > 0) {
+    await Promise.all(invalidFiles.map((file) => cleanupUploadedFile(file)));
     return next(ApiError.validationFailed(errors));
   }
 

@@ -8,10 +8,23 @@ export interface IUserStep extends Document {
   dob?: string;
   gender?: string;
   role?: "user" | "author" | "writer";
+  bio?: string;
+  avatarUrl?: string;
+  craft?: string;
+  location?: string;
+  socialLinks?: Array<{ platform: string; url: string }>;
   step: number;
   createdAt: Date;
   updatedAt: Date;
 }
+
+const userSocialLinkSchema = new Schema(
+  {
+    platform: { type: String, enum: ["website", "instagram", "x", "youtube", "tiktok", "goodreads"], required: true },
+    url: { type: String, trim: true, maxlength: 2048, required: true },
+  },
+  { _id: false },
+);
 
 const userStepSchema = new Schema<IUserStep>(
   {
@@ -46,6 +59,12 @@ const userStepSchema = new Schema<IUserStep>(
       type: String,
       enum: ["user", "author", "writer"],
     },
+
+    bio: { type: String, trim: true, maxlength: 500, default: "" },
+    avatarUrl: { type: String, trim: true, maxlength: 2048, default: "" },
+    craft: { type: String, trim: true, maxlength: 80, default: "" },
+    location: { type: String, trim: true, maxlength: 100, default: "" },
+    socialLinks: { type: [userSocialLinkSchema], default: [] },
 
     step: {
       type: Number,
